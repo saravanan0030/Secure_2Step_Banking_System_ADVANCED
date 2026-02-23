@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cryptic | Indian Banking Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg-color: #0d0d0d;
+    --card-bg: #1a1a1a;
+    --accent-green: #9fff4a;
+    --accent-red: #ff4a4a;
+    --accent-yellow: #ffd700;
+    --text-main: #ffffff;
+    --text-dim: #888888;
+    --sidebar-width: 240px;
+    --border: 1px solid #333;
+    --badge-bg: #222;
+    --badge-text: #aaa;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-color);
+    color: var(--text-main);
+    margin: 0;
+    display: flex;
+}
+
+/* Sidebar */
+.sidebar {
+    width: var(--sidebar-width);
+    background: #000;
+    height: 100vh;
+    padding: 20px;
+    position: fixed;
+    border-right: var(--border);
+}
+.logo {
+    color: var(--accent-green);
+    font-size: 22px;
+    font-weight: bold;
+    margin-bottom: 40px;
+    letter-spacing: 1px;
+}
+.nav-item {
+    padding: 12px 15px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: 0.3s;
+    border-radius: 8px;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+.nav-item:hover {
+    background: #111;
+    color: white;
+}
+.nav-item.active {
+    background: #1a1a1a;
+    color: var(--accent-green);
+    border-left: 3px solid var(--accent-green);
+}
+
+/* Main Content */
+.main-content {
+    margin-left: calc(var(--sidebar-width) + 40px);
+    padding: 30px;
+    width: 100%;
+    max-width: 1200px;
+}
+.hidden { display: none !important; }
+
+/* Cards & Action Bars */
+.card, .action-bar {
+    background: var(--card-bg);
+    border-radius: 15px;
+    padding: 20px;
+    border: var(--border);
+    margin-bottom: 25px;
+}
+.action-bar { padding: 25px; }
+
+.bank-label { font-size: 11px; color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; display: block; }
+input, select {
+    background: #262626;
+    border: 1px solid #444;
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 15px;
+}
+button.primary-btn {
+    background: var(--accent-green);
+    color: black;
+    font-weight: bold;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+}
+
+/* Grid Layout */
+.transaction-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+th { text-align: left; color: var(--text-dim); font-size: 12px; padding: 12px 0; border-bottom: var(--border); }
+td { padding: 12px 0; border-bottom: 1px solid #222; }
+.badge-upi { background: #5f27cd; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+.badge-neft { background: #222; color: #aaa; border: 1px solid #444; padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+.badge-deposit { background: var(--accent-green); color: black; padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+.badge-withdraw { background: var(--accent-red); color: black; padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+.badge-crypto { background: var(--accent-yellow); color: black; padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="logo">BHARAT PAY | DARK</div>
+    <div class="nav-item active" id="btn-portfolio" onclick="showView('portfolio')">Dashboard</div>
+    <div class="nav-item" id="btn-transfer" onclick="showView('transfer')">Send Money</div>
+    <div class="nav-item" id="btn-assets" onclick="showView('assets')">Crypto Assets</div>
+    <div class="nav-item" id="btn-history" onclick="showView('history')">Passbook</div>
+</div>
+
+<div class="main-content">
+    <header style="margin-bottom: 30px;">
+        <h2 id="view-title">Welcome, {{ customer[2] }}</h2>
+        <div style="color: var(--accent-green); font-size: 14px;">A/C: {{ customer[1] }} | IFSC: BKID0001234</div>
+    </header>
+
+    <!-- PORTFOLIO -->
+    <div id="view-portfolio">
+        <div class="transaction-grid">
+            <div class="card">
+                <span class="bank-label">Total Balance</span>
+                <div style="font-size: 36px; font-weight: bold;">₹{{ "{:,.2f}".format(customer[5]) }}</div>
+                <div style="color: var(--text-dim); margin-top: 10px; font-size: 12px;">Linked Mobile: +91 {{ customer[4] }}</div>
+            </div>
+            <div class="card" style="border-color: var(--accent-green);">
+                <span class="bank-label">Quick UPI Transfer</span>
+                <input type="text" placeholder="Enter UPI ID">
+                <button class="primary-btn">Pay Now</button>
+            </div>
+        </div>
+        <div class="card">
+            <h3>Portfolio Overview</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset</th>
+                        <th>Quantity</th>
+                        <th>Value (INR)</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Bitcoin (BTC)</td>
+                        <td>0.0045</td>
+                        <td>₹24,50,000</td>
+                        <td><button style="padding:5px 15px; background:none; border:1px solid #444; color:white;">Sell</button></td>
+                    </tr>
+                    <tr>
+                        <td>Ethereum (ETH)</td>
+                        <td>0.12</td>
+                        <td>₹2,30,000</td>
+                        <td><button style="padding:5px 15px; background:none; border:1px solid #444; color:white;">Sell</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TRANSFER -->
+    <div id="view-transfer" class="hidden">
+        <div class="action-bar">
+            <h3>Domestic Money Transfer</h3>
+            <form action="/user_transaction" method="POST">
+                <div class="transaction-grid">
+                    <div>
+                        <span class="bank-label">Beneficiary Name</span>
+                        <input type="text" placeholder="Account Holder Name" required>
+                        <span class="bank-label">Account Number</span>
+                        <input type="number" placeholder="Enter 12-16 Digit A/C">
+                    </div>
+                    <div>
+                        <span class="bank-label">IFSC Code</span>
+                        <input type="text" placeholder="SBIN000XXXX">
+                        <span class="bank-label">Transfer Type</span>
+                        <select name="type">
+                            <option value="imps">IMPS (Instant)</option>
+                            <option value="neft">NEFT (Standard)</option>
+                            <option value="upi">UPI</option>
+                        </select>
+                    </div>
+                </div>
+                <span class="bank-label">Amount (INR)</span>
+                <input type="number" name="amount" placeholder="₹ 0.00" style="font-size: 20px;">
+                <button type="submit" class="primary-btn">Confirm Transfer</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ASSETS -->
+    <div id="view-assets" class="hidden">
+        <div class="card">
+            <h3>Crypto-to-INR Liquidity</h3>
+            <p style="color: var(--text-dim)">Withdraw your crypto assets directly to your linked Indian Bank Account.</p>
+            <table>
+                <thead>
+                    <tr><th>Crypto</th><th>Quantity</th><th>Value (INR)</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Bitcoin (BTC)</td><td>0.0045</td><td>₹24,50,000</td><td><button>Sell to INR</button></td></tr>
+                    <tr><td>Ethereum (ETH)</td><td>0.12</td><td>₹2,30,000</td><td><button>Sell to INR</button></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TRANSACTION HISTORY -->
+    <div id="view-history" class="hidden">
+        <div class="card">
+            <h3>Transaction History</h3>
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>Description</th><th>Ref No / UPI ID</th><th>Amount</th></tr>
+                </thead>
+                <tbody>
+                    {% if transactions %}
+                        {% for t in transactions %}
+                        <tr>
+                            <td>{{ t[4] }}</td>
+                            <td>{{ t[2].upper() }} Transfer</td>
+                            <td>
+                                {% if t[2] == 'upi' %}
+                                    <span class="badge-upi">{{ t[0] }}</span>
+                                {% elif t[2] == 'neft' %}
+                                    <span class="badge-neft">{{ t[0] }}</span>
+                                {% elif t[2] == 'crypto' %}
+                                    <span class="badge-crypto">{{ t[0] }}</span>
+                                {% elif t[2] == 'deposit' %}
+                                    <span class="badge-deposit">{{ t[0] }}</span>
+                                {% else %}
+                                    <span class="badge-withdraw">{{ t[0] }}</span>
+                                {% endif %}
+                            </td>
+                            <td style="color: {{ 'var(--accent-green)' if t[2] in ['deposit','upi','crypto'] else 'var(--accent-red)' }}">
+                                {{ '+' if t[2] in ['deposit','upi','crypto'] else '-' }} ₹{{ "{:,.2f}".format(t[3]) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function showView(viewName) {
+    ['view-portfolio','view-transfer','view-assets','view-history'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    ['btn-portfolio','btn-transfer','btn-assets','btn-history'].forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('view-' + viewName).classList.remove('hidden');
+    document.getElementById('btn-' + viewName).classList.add('active');
+
+    const titles = {
+        'portfolio': 'Banking Dashboard',
+        'transfer': 'Money Transfer',
+        'assets': 'Asset Liquidity',
+        'history': 'Account Passbook'
+    };
+    document.getElementById('view-title').innerText = titles[viewName];
+}
+</script>
+
+</body>
+</html> 
