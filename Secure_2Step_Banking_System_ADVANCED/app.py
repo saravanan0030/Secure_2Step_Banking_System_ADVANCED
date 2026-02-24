@@ -3,35 +3,12 @@ import sqlite3
 import random
 import hashlib
 from datetime import datetime, timedelta
-import smtplib
-from email.mime.text import MIMEText
 from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_123"
 
 DB_NAME = "database.db"
-
-# ================= EMAIL CONFIG =================
-
-SENDER_EMAIL = "k.saravanan0030@gmail.com"
-SENDER_PASSWORD = "hrgdsfafefqynnvo"
-
-def send_email(receiver, subject, body):
-    try:
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = SENDER_EMAIL
-        msg["To"] = receiver
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.sendmail(SENDER_EMAIL, receiver, msg.as_string())
-        server.quit()
-        print("Email sent to", receiver)
-        return True
-    except Exception as e:
-        print("Email Error:", e)
-        return False
 
 # ================= DATABASE =================
 
@@ -57,8 +34,6 @@ def init_db():
         address TEXT,
         aadhaar TEXT,
         approval_status TEXT DEFAULT 'pending',
-        otp_hash TEXT,
-        otp_expiry TEXT,
         last_login TEXT
     )
     """)
@@ -93,9 +68,6 @@ def hash_text(text):
 def generate_account():
     return str(random.randint(1000000000, 9999999999))
 
-def generate_otp():
-    return str(random.randint(100000, 999999))
-
 def roles_allowed(*roles):
     def wrapper(f):
         @wraps(f)
@@ -123,6 +95,8 @@ def home():
     conn.close()
     if user["role"] == "admin":
         return redirect("/admin_dashboard")
+    if user["role"] == "employee":
+        return redirect("/employee_dashboard")
     if not user["full_name"]:
         return redirect("/create_profile")
     if user["approval_status"] != "approved":
@@ -161,10 +135,10 @@ def login():
     if request.method == "POST":
         email = request.form["email"]
         password = hash_text(request.form["password"])
-        selected_role = request.form["role"]  # Role from hidden input
+        selected_role = request.form["role"]
         conn = db()
         user = conn.execute("""
-        SELECT email,password,last_login,role
+        SELECT email,password,role
         FROM users WHERE email=?""", (email,)).fetchone()
         conn.close()
 
@@ -178,79 +152,18 @@ def login():
             flash(f"Invalid role selected for this account ({user['role']})")
             return redirect("/login")
 
-        # Admin → direct dashboard
-        if user["role"] == "admin":
-            session.clear()
-            session["user"] = email
-            session["role"] = "admin"
-            flash("Admin login success")
-            return redirect("/admin_dashboard")
-
-        # First time login → OTP
-        if not user["last_login"]:
-            otp = generate_otp()
-            conn = db()
-            conn.execute("""
-            UPDATE users SET otp_hash=?, otp_expiry=? WHERE email=?""",
-            (hash_text(otp), (datetime.now()+timedelta(minutes=5)).isoformat(), email))
-            conn.commit()
-            conn.close()
-            send_email(email, "Bank OTP", f"Your OTP is {otp}")
-            session["temp_user"] = email
-            flash("OTP sent")
-            return redirect("/otp")
-
-        # Normal login
         session.clear()
         session["user"] = email
         session["role"] = user["role"]
         flash("Login success")
-        if user["role"] == "employee":
+
+        if user["role"] == "admin":
+            return redirect("/admin_dashboard")
+        elif user["role"] == "employee":
             return redirect("/employee_dashboard")
         else:
             return redirect("/user_dashboard")
     return render_template("login.html")
-
-# ================= OTP =================
-
-@app.route("/otp", methods=["GET", "POST"])
-def otp():
-    if "temp_user" not in session:
-        return redirect("/login")
-    if request.method == "POST":
-        entered = hash_text(request.form["otp"])
-        conn = db()
-        user = conn.execute("""
-        SELECT otp_hash,email,role FROM users WHERE email=?""",
-        (session["temp_user"],)).fetchone()
-        if entered == user["otp_hash"]:
-            session.clear()
-            session["user"] = user["email"]
-            session["role"] = user["role"]
-            conn.execute("""UPDATE users SET last_login=? WHERE email=?""",
-                         (datetime.now().isoformat(), user["email"]))
-            conn.commit()
-            flash("Login success")
-            return redirect("/")
-        flash("Invalid OTP")
-    return render_template("otp.html")
-
-# ================= RESEND OTP =================
-
-@app.route("/resend_otp")
-def resend_otp():
-    if "temp_user" not in session:
-        return redirect("/login")
-    email = session["temp_user"]
-    otp = generate_otp()
-    conn = db()
-    conn.execute("""UPDATE users SET otp_hash=?, otp_expiry=? WHERE email=?""",
-                 (hash_text(otp), (datetime.now()+timedelta(minutes=5)).isoformat(), email))
-    conn.commit()
-    conn.close()
-    send_email(email, "Bank OTP Resend", f"Your OTP is {otp}")
-    flash("OTP resent")
-    return redirect("/otp")
 
 # ================= CREATE PROFILE =================
 
@@ -288,15 +201,62 @@ def user_dashboard():
     conn.close()
     return render_template("user_dashboard.html", customer=user)
 
-# ================= EMPLOYEE DASHBOARD =================
+# ================= EMPLOYEE MODULE =================
 
 @app.route("/employee_dashboard")
 @roles_allowed("employee")
 def employee_dashboard():
     conn = db()
-    user = conn.execute("SELECT * FROM users WHERE email=?", (session["user"],)).fetchone()
+    employee = conn.execute("SELECT * FROM users WHERE email=?", (session["user"],)).fetchone()
+    users = conn.execute("""
+        SELECT id, account_number, name, email, full_name, phone, address, aadhaar, approval_status
+        FROM users WHERE role='user'
+    """).fetchall()
     conn.close()
-    return render_template("employee_dashboard.html", employee=user)
+    return render_template("employee_dashboard.html", employee=employee, users=users)
+
+
+@app.route("/employee_user/<int:user_id>", methods=["GET", "POST"])
+@roles_allowed("employee")
+def employee_user_profile(user_id):
+    conn = db()
+    user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if request.method == "POST":
+        full_name = request.form["full_name"]
+        phone = request.form["phone"]
+        address = request.form["address"]
+        aadhaar = request.form["aadhaar"]
+        approval_status = request.form["approval_status"]
+        conn.execute("""
+            UPDATE users SET full_name=?, phone=?, address=?, aadhaar=?, approval_status=?
+            WHERE id=?
+        """, (full_name, phone, address, aadhaar, approval_status, user_id))
+        conn.commit()
+        conn.close()
+        flash("User profile updated successfully")
+        return redirect("/employee_dashboard")
+    conn.close()
+    return render_template("employee_user_profile.html", employee=session["user"], user=user)
+
+
+@app.route("/create_employee", methods=["POST"])
+@roles_allowed("employee", "admin")
+def create_employee():
+    name = request.form["name"]
+    email = request.form["email"]
+    password = hash_text(request.form["password"])
+    role = request.form.get("role", "employee")
+    conn = db()
+    try:
+        conn.execute("""
+        INSERT INTO users (name, email, password, role, last_login)
+        VALUES (?,?,?,?,?)""", (name, email, password, role, None))
+        conn.commit()
+        flash("Employee created successfully")
+    except sqlite3.IntegrityError:
+        flash("Email already exists")
+    conn.close()
+    return redirect("/employee_dashboard")
 
 # ================= ADMIN DASHBOARD =================
 
@@ -308,7 +268,6 @@ def admin_dashboard():
     conn.close()
     return render_template("admin_dashboard.html", users=users)
 
-# ================= APPROVE =================
 
 @app.route("/approve/<int:id>")
 @roles_allowed("admin")
