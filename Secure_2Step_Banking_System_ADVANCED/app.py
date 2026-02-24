@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, flash, url_for
+from flask import Flask, render_template, request, redirect, session, flash
 import sqlite3
 import random
 import hashlib
@@ -12,104 +12,97 @@ app.secret_key = "super_secret_key_123"
 
 DB_NAME = "database.db"
 
+# ================= EMAIL CONFIG =================
 
-# =====================================================
-# DATABASE CONNECTION
-# =====================================================
+SENDER_EMAIL = "k.saravanan0030@gmail.com"
+SENDER_PASSWORD = "hrgdsfafefqynnvo"
+
+
+def send_email(receiver, subject, body):
+    try:
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = receiver
+
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.sendmail(SENDER_EMAIL, receiver, msg.as_string())
+        server.quit()
+
+        print("Email sent to", receiver)
+        return True
+
+    except Exception as e:
+        print("Email Error:", e)
+        return False
+
+
+# ================= DATABASE =================
 
 def db():
-    return sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-
-# =====================================================
-# DATABASE INITIALIZATION
-# =====================================================
 
 def init_db():
 
-    conn = sqlite3.connect(DB_NAME)
+    conn = db()
     c = conn.cursor()
 
-    # USERS TABLE
     c.execute("""
     CREATE TABLE IF NOT EXISTS users (
-
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-
         account_number TEXT UNIQUE,
-
         name TEXT,
         email TEXT UNIQUE,
         password TEXT,
-
         balance REAL DEFAULT 0,
         role TEXT DEFAULT 'user',
-
         full_name TEXT,
         phone TEXT,
         address TEXT,
         aadhaar TEXT,
-
-        is_locked INTEGER DEFAULT 0,
-        lock_time TEXT,
-        failed_attempts INTEGER DEFAULT 0,
-
+        approval_status TEXT DEFAULT 'pending',
         otp_hash TEXT,
         otp_expiry TEXT,
-
         last_login TEXT
     )
     """)
 
-    # TRANSACTIONS TABLE
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS transactions (
-
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-
-        sender_acc TEXT,
-        amount REAL,
-        type TEXT,
-        performed_by TEXT,
-
-        timestamp TEXT
-    )
-    """)
-
-    # CREATE DEFAULT ADMIN
+    # Create Admin
     admin_email = "admin@bank.com"
     admin_pw = hashlib.sha256("admin123".encode()).hexdigest()
 
-    user = c.execute("SELECT * FROM users WHERE email=?",
-                     (admin_email,)).fetchone()
+    admin = c.execute(
+        "SELECT * FROM users WHERE email=?",
+        (admin_email,)
+    ).fetchone()
 
-    if not user:
-
+    if not admin:
         c.execute("""
         INSERT INTO users
-        (account_number,name,email,password,role)
-        VALUES (?,?,?,?,?)
+        (account_number,name,email,password,role,approval_status,last_login)
+        VALUES (?,?,?,?,?,?,?)
         """, (
             "0000000000",
             "System Admin",
             admin_email,
             admin_pw,
-            "admin"
+            "admin",
+            "approved",
+            datetime.now().isoformat()  # IMPORTANT → skip OTP
         ))
-
-        print("Admin created")
 
     conn.commit()
     conn.close()
 
 
-# Run database init
 init_db()
 
 
-# =====================================================
-# UTILITIES
-# =====================================================
+# ================= UTILITIES =================
 
 def hash_text(text):
     return hashlib.sha256(text.encode()).hexdigest()
@@ -123,12 +116,7 @@ def generate_otp():
     return str(random.randint(100000, 999999))
 
 
-# =====================================================
-# ROLE SECURITY
-# =====================================================
-
 def roles_allowed(*roles):
-
     def wrapper(f):
 
         @wraps(f)
@@ -145,47 +133,10 @@ def roles_allowed(*roles):
             return f(*args, **kwargs)
 
         return decorated
-
     return wrapper
 
 
-# =====================================================
-# EMAIL CONFIG
-# =====================================================
-
-SENDER_EMAIL = "k.saravanan0030@gmail.com"
-SENDER_PASSWORD = "hrgdsfafefqynnvo"
-
-
-def send_email(to, subject, body):
-
-    try:
-
-        msg = MIMEText(body)
-
-        msg["Subject"] = subject
-        msg["From"] = SENDER_EMAIL
-        msg["To"] = to
-
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
-
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-
-        server.sendmail(SENDER_EMAIL, to, msg.as_string())
-
-        server.quit()
-
-        return True
-
-    except Exception as e:
-
-        print("EMAIL ERROR:", e)
-        return False
-
-
-# =====================================================
-# HOME
-# =====================================================
+# ================= HOME =================
 
 @app.route("/")
 def home():
@@ -193,30 +144,28 @@ def home():
     if "user" not in session:
         return redirect("/login")
 
-    role = session["role"]
-
-    if role == "admin":
-        return redirect("/admin_dashboard")
-
-    if role == "employee":
-        return redirect("/employee_dashboard")
-
     conn = db()
 
-    profile = conn.execute("""
-        SELECT full_name FROM users WHERE email=?
+    user = conn.execute("""
+    SELECT role,approval_status,full_name
+    FROM users WHERE email=?
     """, (session["user"],)).fetchone()
 
     conn.close()
 
-    if profile and profile[0]:
-        return redirect("/user_dashboard")
+    if user["role"] == "admin":
+        return redirect("/admin_dashboard")
 
-    return redirect("/create_profile") 
+    if not user["full_name"]:
+        return redirect("/create_profile")
 
-# =====================================================
-# REGISTER
-# =====================================================
+    if user["approval_status"] != "approved":
+        return redirect("/waiting")
+
+    return redirect("/user_dashboard")
+
+
+# ================= REGISTER =================
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -235,13 +184,19 @@ def register():
 
             conn.execute("""
             INSERT INTO users
-            (account_number,name,email,password)
-            VALUES (?,?,?,?)
-            """, (acc, name, email, password))
+            (account_number,name,email,password,last_login)
+            VALUES (?,?,?,?,?)
+            """, (
+                acc,
+                name,
+                email,
+                password,
+                None  # OTP required first login
+            ))
 
             conn.commit()
 
-            flash("Registration successful")
+            flash("Registration Successful")
 
             return redirect("/login")
 
@@ -254,98 +209,91 @@ def register():
     return render_template("register.html")
 
 
-# =====================================================
-# LOGIN
-# =====================================================
- # ================= LOGIN =================
+# ================= LOGIN =================
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
+
     if request.method == "POST":
+
         email = request.form["email"]
         password = hash_text(request.form["password"])
 
         conn = db()
+
         user = conn.execute("""
-        SELECT password,is_locked,lock_time,failed_attempts,last_login,role
+        SELECT email,password,last_login,role
         FROM users WHERE email=?
         """, (email,)).fetchone()
 
         if not user:
             flash("User not found")
-            conn.close()
             return redirect("/login")
 
-        db_pw, locked, lock_time, attempts, last_login, role = user
+        if password != user["password"]:
+            flash("Invalid password")
+            return redirect("/login")
 
-        # CHECK LOCK
-        if locked == 1 and lock_time:
-            unlock_time = datetime.fromisoformat(lock_time) + timedelta(minutes=5)
-            if datetime.now() < unlock_time:
-                flash("Account locked. Try after 5 minutes")
-                conn.close()
-                return redirect("/login")
+        # ✅ ADMIN LOGIN → NO OTP
+        if user["role"] == "admin":
 
-        # CORRECT PASSWORD
-        if password == db_pw:
-            # Direct login if already verified before
-            if last_login:
-                session["user"] = email
-                session["role"] = role
-                conn.execute("UPDATE users SET last_login=? WHERE email=?",
-                             (datetime.now().isoformat(), email))
-                conn.commit()
-                conn.close()
-                flash("Login successful")
-                return redirect("/user_dashboard")
-            else:
-                # First-time login → OTP
-                otp = generate_otp()
-                conn.execute("""
-                UPDATE users SET
-                    otp_hash=?,
-                    otp_expiry=?,
-                    failed_attempts=0,
-                    is_locked=0
-                WHERE email=?
-                """, (hash_text(otp),
-                      (datetime.now()+timedelta(minutes=2)).isoformat(),
-                      email))
-                conn.commit()
-                conn.close()
-                send_email(email, "Bank OTP", f"Your OTP is {otp}")
-                session["temp_user"] = email
-                flash("OTP sent. Please verify.")
-                return redirect("/otp")
+            session.clear()
 
-        # WRONG PASSWORD
-        else:
-            attempts = (attempts or 0) + 1
-            if attempts >= 3:
-                conn.execute("""
-                UPDATE users SET is_locked=1, lock_time=? WHERE email=?
-                """, (datetime.now().isoformat(), email))
-                flash("Account locked for 5 minutes")
-            else:
-                conn.execute("""
-                UPDATE users SET failed_attempts=? WHERE email=?
-                """, (attempts, email))
-                flash(f"Invalid password Attempt {attempts}/3")
+            session["user"] = user["email"]
+            session["role"] = "admin"
+
+            flash("Admin login success")
+
+            return redirect("/admin_dashboard")
+
+        # ✅ FIRST TIME USER LOGIN → OTP
+        if not user["last_login"]:
+
+            otp = generate_otp()
+
+            conn.execute("""
+            UPDATE users SET otp_hash=?, otp_expiry=?
+            WHERE email=?
+            """, (
+                hash_text(otp),
+                (datetime.now()+timedelta(minutes=5)).isoformat(),
+                email
+            ))
+
             conn.commit()
-            conn.close()
-            return redirect("/login")
+
+            send_email(
+                email,
+                "Bank OTP",
+                f"Your OTP is {otp}"
+            )
+
+            session["temp_user"] = email
+
+            flash("OTP sent")
+
+            return redirect("/otp")
+
+        # ✅ NORMAL LOGIN
+        session.clear()
+
+        session["user"] = email
+        session["role"] = user["role"]
+
+        flash("Login success")
+
+        return redirect("/")
+
     return render_template("login.html")
 
-# =====================================================
-# OTP VERIFY
-# =====================================================
+
+# ================= OTP =================
 
 @app.route("/otp", methods=["GET", "POST"])
 def otp():
 
     if "temp_user" not in session:
         return redirect("/login")
-
-    email = session["temp_user"]
 
     if request.method == "POST":
 
@@ -354,53 +302,37 @@ def otp():
         conn = db()
 
         user = conn.execute("""
-        SELECT otp_hash,otp_expiry,role
+        SELECT otp_hash,email,role
         FROM users WHERE email=?
-        """, (email,)).fetchone()
+        """, (session["temp_user"],)).fetchone()
 
-        if user:
+        if entered == user["otp_hash"]:
 
-            db_hash, expiry, role = user
+            session.clear()
 
-            if expiry and datetime.now() > datetime.fromisoformat(expiry):
+            session["user"] = user["email"]
+            session["role"] = user["role"]
 
-                flash("OTP expired")
-                return redirect("/otp")
+            conn.execute("""
+            UPDATE users SET last_login=?
+            WHERE email=?
+            """, (
+                datetime.now().isoformat(),
+                user["email"]
+            ))
 
-            if entered == db_hash:
+            conn.commit()
 
-                session.clear()
+            flash("Login success")
 
-                session["user"] = email
-                session["role"] = role
-
-                conn.execute("""
-                UPDATE users SET
-
-                otp_hash=NULL,
-                otp_expiry=NULL,
-                last_login=?
-
-                WHERE email=?
-                """, (datetime.now().isoformat(), email))
-
-                conn.commit()
-                conn.close()
-
-                flash("Login success")
-
-                return redirect("/")
-
-        conn.close()
+            return redirect("/")
 
         flash("Invalid OTP")
 
     return render_template("otp.html")
 
 
-# =====================================================
-# RESEND OTP
-# =====================================================
+# ================= RESEND OTP =================
 
 @app.route("/resend_otp")
 def resend_otp():
@@ -415,33 +347,90 @@ def resend_otp():
     conn = db()
 
     conn.execute("""
-    UPDATE users SET
-
-    otp_hash=?,
-    otp_expiry=?
-
+    UPDATE users SET otp_hash=?, otp_expiry=?
     WHERE email=?
     """, (
-
         hash_text(otp),
-        (datetime.now() +
-         timedelta(minutes=2)).isoformat(),
+        (datetime.now()+timedelta(minutes=5)).isoformat(),
         email
     ))
 
     conn.commit()
     conn.close()
 
-    send_email(email, "Resend OTP", f"Your OTP is {otp}")
+    send_email(email, "Bank OTP Resend", f"Your OTP is {otp}")
 
-    flash("New OTP sent")
+    flash("OTP resent")
 
     return redirect("/otp")
 
 
-# =====================================================
-# ADMIN DASHBOARD
-# =====================================================
+# ================= CREATE PROFILE =================
+
+@app.route("/create_profile", methods=["GET", "POST"])
+def create_profile():
+
+    if request.method == "POST":
+
+        conn = db()
+
+        conn.execute("""
+        UPDATE users SET
+        full_name=?, phone=?, address=?, aadhaar=?,
+        approval_status='pending'
+        WHERE email=?
+        """, (
+            request.form["full_name"],
+            request.form["phone"],
+            request.form["address"],
+            request.form["aadhaar"],
+            session["user"]
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return redirect("/waiting")
+
+    return render_template("create_profile.html")
+
+
+# ================= WAITING =================
+
+@app.route("/waiting")
+def waiting():
+
+    conn = db()
+
+    status = conn.execute("""
+    SELECT approval_status FROM users WHERE email=?
+    """, (session["user"],)).fetchone()["approval_status"]
+
+    conn.close()
+
+    if status == "approved":
+        return redirect("/user_dashboard")
+
+    return render_template("waiting.html")
+
+
+# ================= USER DASHBOARD =================
+
+@app.route("/user_dashboard")
+def user_dashboard():
+
+    conn = db()
+
+    user = conn.execute("""
+    SELECT * FROM users WHERE email=?
+    """, (session["user"],)).fetchone()
+
+    conn.close()
+
+    return render_template("user_dashboard.html", customer=user)
+
+
+# ================= ADMIN DASHBOARD =================
 
 @app.route("/admin_dashboard")
 @roles_allowed("admin")
@@ -450,126 +439,45 @@ def admin_dashboard():
     conn = db()
 
     users = conn.execute("""
-    SELECT name,email,role,balance
-    FROM users
-    """).fetchall()
-
-    logs = conn.execute("""
-    SELECT *
-    FROM transactions
-    ORDER BY id DESC
-    """).fetchall()
-
-    conn.close()
-
-    return render_template("admin_dashboard.html",
-                           users=users,
-                           logs=logs)
-
-
-# =====================================================
-# EMPLOYEE DASHBOARD
-# =====================================================
-
-@app.route("/employee_dashboard")
-@roles_allowed("employee", "admin")
-def employee_dashboard():
-
-    conn = db()
-
-    users = conn.execute("""
-    SELECT name,account_number,balance
+    SELECT id, name, email, role, balance, approval_status
     FROM users
     """).fetchall()
 
     conn.close()
 
-    return render_template("employee_dashboard.html",
-                           users=users)
+    return render_template("admin_dashboard.html", users=users)
 
 
-# =====================================================
-# CREATE PROFILE
-# =====================================================
-@app.route("/create_profile", methods=["GET","POST"])
-def create_profile():
+# ================= APPROVE =================
 
-    if "user" not in session:
-        return redirect("/login")
-
-    email = session["user"]
+@app.route("/approve/<int:id>")
+@roles_allowed("admin")
+def approve(id):
 
     conn = db()
 
-    # CHECK IF PROFILE EXISTS
-    existing = conn.execute("""
-        SELECT full_name FROM users WHERE email=?
-    """, (email,)).fetchone()
+    conn.execute("""
+    UPDATE users SET approval_status='approved'
+    WHERE id=?
+    """, (id,))
 
-    # IF PROFILE EXISTS → GO DASHBOARD
-    if existing and existing[0]:
-        conn.close()
-        return redirect("/user_dashboard")
-
-    if request.method == "POST":
-
-        full_name = request.form["full_name"]
-        phone = request.form["phone"]
-        address = request.form["address"]
-        aadhaar = request.form["aadhaar"]
-
-        conn.execute("""
-            UPDATE users SET
-            full_name=?,
-            phone=?,
-            address=?,
-            aadhaar=?
-            WHERE email=?
-        """, (full_name, phone, address, aadhaar, email))
-
-        conn.commit()
-        conn.close()
-
-        flash("Profile Created Successfully")
-
-        return redirect("/user_dashboard")
-
+    conn.commit()
     conn.close()
 
-    return render_template("create_profile.html") 
+    return redirect("/admin_dashboard")
 
 
+# ================= LOGOUT =================
 
-@app.route("/user_dashboard")
-def user_dashboard():
-    if "user" not in session:
-        return redirect("/login")
-    
-    email = session["user"]
-    conn = db()
-    customer = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-    conn.close()
+@app.route("/logout")
+def logout():
 
-    if not customer:
-        flash("User not found")
-        return redirect("/login")
+    session.clear()
 
-    # Pass 'customer' to template
-    return render_template("user_dashboard.html", customer=customer)
+    return redirect("/login")
 
 
-
-
-
-
-
-
-
-
-
-# =====================================================
-# RUN
-# =====================================================
+# ================= RUN =================
 
 if __name__ == "__main__":
     app.run(debug=True) 
