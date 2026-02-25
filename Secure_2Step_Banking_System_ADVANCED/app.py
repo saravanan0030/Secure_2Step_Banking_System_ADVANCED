@@ -80,6 +80,15 @@ def init_db():
         )
     """)
 
+    # LOGIN ATTEMPTS TABLE (for password lockout)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS login_attempts (
+            email TEXT PRIMARY KEY,
+            attempts INTEGER DEFAULT 0,
+            locked_until TEXT
+        )
+    """)
+
     # TRANSACTIONS TABLE
     c.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
@@ -189,33 +198,45 @@ def register():
         raw_password = request.form["password"]
         password = hash_text(raw_password)
         role = request.form.get("role", "user").lower()
-        acc = generate_account()
 
         conn = db()
-        try:
-            conn.execute("""
-                INSERT INTO users (account_number, name, email, password, role, approval_status)
-                VALUES (?, ?, ?, ?, ?, 'pending')
-            """, (acc, name, email, password, role))
-            conn.commit()
-
-            otp = generate_otp()
-            expires_at = (datetime.now() + timedelta(minutes=5)).isoformat()
-            conn.execute("INSERT INTO otp_codes (email, otp, expires_at) VALUES (?, ?, ?)",
-                         (email, otp, expires_at))
-            conn.commit()
-            conn.close()
-
-            send_email(email, "Your Bank OTP",
-                       f"Your OTP is {otp}. Expires in 5 minutes. Max 3 attempts.")
-
-            session["otp_email"] = email
-            flash("Registration successful! OTP sent.")
-            return redirect("/verify_otp")
-
-        except sqlite3.IntegrityError:
+        # Check if email already exists in final users table
+        existing = conn.execute(
+            "SELECT id FROM users WHERE email=?", (email,)
+        ).fetchone()
+        if existing:
             flash("Email already exists")
             conn.close()
+            return render_template("register.html")
+
+        # Generate OTP first, and store registration data in session until OTP is verified
+        otp = generate_otp()
+        expires_at = (datetime.now() + timedelta(minutes=5)).isoformat()
+
+        conn.execute(
+            "INSERT INTO otp_codes (email, otp, expires_at) VALUES (?, ?, ?)",
+            (email, otp, expires_at),
+        )
+        conn.commit()
+        conn.close()
+
+        # Cache registration details in session until OTP success
+        session["pending_registration"] = {
+            "name": name,
+            "email": email,
+            "password": password,
+            "role": role,
+        }
+        session["otp_email"] = email
+
+        send_email(
+            email,
+            "Your Bank OTP",
+            f"Your OTP is {otp}. Expires in 5 minutes. Max 3 attempts.",
+        )
+
+        flash("Registration started! OTP sent to your email.")
+        return redirect("/verify_otp")
 
     return render_template("register.html")
 
@@ -230,6 +251,8 @@ def verify_otp():
         return redirect("/login")
 
     email = session["otp_email"]
+    pending = session.get("pending_registration")
+
     conn = db()
     record = conn.execute("""
         SELECT * FROM otp_codes WHERE email=?
@@ -249,23 +272,62 @@ def verify_otp():
 
         if record["attempts"] >= 3:
             session.pop("otp_email")
+            flash("Too many incorrect attempts. Please register again.")
             return redirect("/login")
 
         if otp_input != record["otp"]:
-            conn.execute("UPDATE otp_codes SET attempts=attempts+1 WHERE id=?",
-                         (record["id"],))
+            conn.execute(
+                "UPDATE otp_codes SET attempts=attempts+1 WHERE id=?",
+                (record["id"],),
+            )
             conn.commit()
+            conn.close()
+            flash("Incorrect OTP.")
             return redirect("/verify_otp")
 
+        # OTP is correct. If this is a fresh registration, create the user now.
+        if pending and pending.get("email") == email:
+            acc = generate_account()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO users (account_number, name, email, password, role, approval_status)
+                    VALUES (?, ?, ?, ?, ?, 'pending')
+                    """,
+                    (
+                        acc,
+                        pending["name"],
+                        pending["email"],
+                        pending["password"],
+                        pending["role"],
+                    ),
+                )
+                conn.commit()
+            except sqlite3.IntegrityError:
+                # If a race created the user already, ignore and continue
+                conn.rollback()
+
+        # Log user in and move to profile creation
         session["user"] = email
-        conn.execute("UPDATE users SET last_login=? WHERE email=?",
-                     (datetime.now().isoformat(), email))
+        conn.execute(
+            "UPDATE users SET last_login=? WHERE email=?",
+            (datetime.now().isoformat(), email),
+        )
         conn.commit()
         conn.close()
-        session.pop("otp_email")
+
+        # Clear OTP and pending registration cache
+        session.pop("otp_email", None)
+        session.pop("pending_registration", None)
+
         return redirect("/create_profile")
 
-    return render_template("otp.html")
+    remaining_attempts = max(0, 3 - (record["attempts"] or 0))
+    return render_template(
+        "otp.html",
+        expires_at=record["expires_at"],
+        remaining_attempts=remaining_attempts,
+    )
 
 
 
@@ -315,17 +377,76 @@ def login():
 
         conn = db()
         user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-        conn.close()
+
+        # Check lock status (per email)
+        la = conn.execute(
+            "SELECT attempts, locked_until FROM login_attempts WHERE email=?",
+            (email,),
+        ).fetchone()
+
+        if la and la["locked_until"]:
+            try:
+                locked_until = datetime.fromisoformat(la["locked_until"])
+            except ValueError:
+                locked_until = None
+            if locked_until and locked_until > datetime.now():
+                remaining = locked_until - datetime.now()
+                minutes = int(remaining.total_seconds() // 60) + 1
+                flash(f"Account locked due to repeated failures. Try again in about {minutes} minute(s).")
+                conn.close()
+                return redirect("/login")
 
         if not user:
             flash("User not found")
+            conn.close()
             return redirect("/login")
 
         stored_pw = user["password"]
         # Support both hashed and legacy plain-text passwords (for default admin/employee)
         if stored_pw != password and stored_pw != raw_password:
-            flash("Invalid password")
-            return redirect("/login")
+            # Increment login attempts
+            if la:
+                attempts = (la["attempts"] or 0) + 1
+                locked_until_val = la["locked_until"]
+            else:
+                attempts = 1
+                locked_until_val = None
+
+            if attempts >= 3:
+                locked_until_val = (datetime.now() + timedelta(minutes=15)).isoformat()
+                conn.execute(
+                    """
+                    INSERT INTO login_attempts (email, attempts, locked_until)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(email) DO UPDATE SET attempts=?, locked_until=?
+                    """,
+                    (email, attempts, locked_until_val, attempts, locked_until_val),
+                )
+                conn.commit()
+                conn.close()
+                flash("Too many invalid password attempts. Account locked for 15 minutes.")
+                return redirect("/login")
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO login_attempts (email, attempts, locked_until)
+                    VALUES (?, ?, NULL)
+                    ON CONFLICT(email) DO UPDATE SET attempts=?, locked_until=NULL
+                    """,
+                    (email, attempts, attempts),
+                )
+                conn.commit()
+                conn.close()
+                flash(f"Invalid password. {3 - attempts} attempt(s) remaining before lock.")
+                return redirect("/login")
+
+        # Successful login: reset attempts
+        conn.execute(
+            "DELETE FROM login_attempts WHERE email=?",
+            (email,),
+        )
+        conn.commit()
+        conn.close()
 
         db_role = user["role"].lower()
 
@@ -344,6 +465,8 @@ def login():
         session.clear()
         session["user"] = email
         session["role"] = db_role
+
+        flash(f"Login successful as {db_role.capitalize()}")
 
         if db_role == "admin":
             return redirect("/admin_dashboard")

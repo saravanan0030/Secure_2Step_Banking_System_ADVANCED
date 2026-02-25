@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Cryptic | Indian Banking Portal</title>
+<title>Secure Bank</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -429,13 +429,18 @@ td { padding: 12px 0; border-bottom: 1px solid #222; }
     .account-grid {
         grid-template-columns: 1fr;
     }
+    .card,
+    .action-bar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 </style>
 </head>
 <body>
 
 <div class="sidebar">
-    <div class="logo">BHARAT PAY | DARK</div>
+    <div class="logo"> Secure Bank </div>
     <div class="nav-item active" id="btn-portfolio" onclick="showView('portfolio')">Dashboard</div>
     <div class="nav-item" id="btn-transfer" onclick="showView('transfer')">Send Money</div>
     <div class="nav-item" id="btn-assets" onclick="showView('assets')">Crypto Assets</div>
@@ -487,7 +492,7 @@ td { padding: 12px 0; border-bottom: 1px solid #222; }
                     </div>
                     <div>
                         <div class="sub-text">Last login</div>
-                        <div class="overview-foot-number">{{ customer['last_login'] if customer['last_login'] else 'Just now' }}</div>
+                        <div class="overview-foot-number">{{ customer[13] if customer[13] else 'Just now' }}</div>
                     </div>
                 </div>
             </div>
@@ -727,23 +732,23 @@ td { padding: 12px 0; border-bottom: 1px solid #222; }
                     {% if transactions %}
                         {% for t in transactions %}
                         <tr>
-                            <td>{{ t['created_at'] }}</td>
-                            <td>{{ t['type'].upper() }} Transfer</td>
+                            <td>{{ t[5] }}</td>
+                            <td>{{ t[2]|upper }} Transfer</td>
                             <td>
-                                {% if t['type'] == 'upi' %}
-                                    <span class="badge-upi">{{ t['ref'] }}</span>
-                                {% elif t['type'] == 'neft' %}
-                                    <span class="badge-neft">{{ t['ref'] }}</span>
-                                {% elif t['type'] == 'crypto' %}
-                                    <span class="badge-crypto">{{ t['ref'] }}</span>
-                                {% elif t['type'] == 'deposit' %}
-                                    <span class="badge-deposit">{{ t['ref'] }}</span>
+                                {% if t[2] == 'upi' %}
+                                    <span class="badge-upi">{{ t[4] }}</span>
+                                {% elif t[2] == 'neft' %}
+                                    <span class="badge-neft">{{ t[4] }}</span>
+                                {% elif t[2] == 'crypto' %}
+                                    <span class="badge-crypto">{{ t[4] }}</span>
+                                {% elif t[2] == 'deposit' %}
+                                    <span class="badge-deposit">{{ t[4] }}</span>
                                 {% else %}
-                                    <span class="badge-withdraw">{{ t['ref'] }}</span>
+                                    <span class="badge-withdraw">{{ t[4] }}</span>
                                 {% endif %}
                             </td>
-                            <td style="color: {{ 'var(--accent-green)' if t['type'] in ['deposit','upi','crypto'] else 'var(--accent-red)' }}">
-                                {{ '+' if t['type'] in ['deposit','upi','crypto'] else '-' }} ₹{{ "{:,.2f}".format(t['amount']) }}
+                            <td style="color: {{ 'var(--accent-green)' if t[2] in ['deposit','upi','crypto'] else 'var(--accent-red)' }}">
+                                {{ '+' if t[2] in ['deposit','upi','crypto'] else '-' }} ₹{{ "{:,.2f}".format((t[3] or 0)|float) }}
                             </td>
                         </tr>
                         {% endfor %}

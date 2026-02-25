@@ -2,20 +2,32 @@
 
 {% block content %}
 
-<div class="flex items-center justify-center min-h-screen bg-gray-100">
+<div class="min-h-screen w-full flex items-center justify-center bg-[#020b1a] font-sans">
 
-    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+    <!-- Background Effects -->
+    <div class="absolute inset-0 pointer-events-none overflow-hidden">
+        <div class="absolute top-[20%] left-[20%] w-72 h-72 bg-purple-600/10 rounded-full blur-[100px]"></div>
+        <div class="absolute bottom-[20%] right-[20%] w-72 h-72 bg-blue-600/10 rounded-full blur-[100px]"></div>
+    </div>
 
-        <h2 class="text-2xl font-bold text-center text-purple-600 mb-6">
-            OTP Verification
-        </h2>
+    <div class="relative z-20 w-[90%] max-w-[450px] p-8 rounded-3xl bg-[#0a1120]/80 backdrop-blur-2xl shadow-2xl border border-white/5">
+
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-500/10 text-purple-400 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <h2 class="text-3xl font-bold text-white">Verification</h2>
+            <p class="text-gray-400 text-sm mt-2">Enter the code sent to your email</p>
+        </div>
 
         <!-- Flash Messages -->
         {% with messages = get_flashed_messages() %}
         {% if messages %}
-        <div class="mb-4">
+        <div class="mb-6">
             {% for msg in messages %}
-            <div class="bg-blue-100 text-blue-700 p-2 rounded mb-2">
+            <div class="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center">
                 {{ msg }}
             </div>
             {% endfor %}
@@ -24,58 +36,46 @@
         {% endwith %}
 
         <!-- Countdown Timer -->
-        <div id="countdown" class="text-center text-red-500 font-semibold mb-4">
+        <div id="countdown" class="text-center text-purple-400 font-mono font-semibold mb-6 text-lg tracking-wider">
             Loading timer...
         </div>
 
-        <!-- Remaining Attempts -->
-        <div id="attempts" class="text-center text-gray-600 mb-4">
-            Remaining attempts: {{ remaining_attempts }}
-        </div>
-
         <!-- OTP Form -->
-        <form method="POST">
+        <form method="POST" class="space-y-6">
 
-            <label class="block mb-2 font-semibold">
-                Enter OTP
-            </label>
+            <div>
+                <input type="text"
+                       name="otp"
+                       placeholder="• • • • • •"
+                       maxlength="6"
+                       required
+                       class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-center text-white text-2xl tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all placeholder-gray-600">
+            </div>
 
-            <input type="text"
-                   name="otp"
-                   placeholder="Enter 6-digit OTP"
-                   required
-                   class="w-full p-3 border rounded mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <div class="text-center text-xs text-gray-500">
+                Remaining attempts: <span class="text-gray-300">{{ remaining_attempts }}</span>
+            </div>
 
             <button type="submit"
-                    class="w-full bg-purple-600 text-white p-3 rounded hover:bg-purple-700 transition">
-                Verify OTP
+                    class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all">
+                Verify Identity
             </button>
 
         </form>
 
         <!-- Resend OTP -->
-        <div class="text-center mt-4">
-
-            <p class="text-gray-600">
-                Didn't receive OTP?
-            </p>
-
-            
-
-            <a href="{{ url_for('resend_otp') }}" class="text-blue-400 hover:underline font-semibold">
-    Resend OTP
-</a>
-
+        <div class="text-center mt-8 pt-6 border-t border-white/5">
+            <p class="text-gray-400 text-sm mb-3">Didn't receive the code?</p>
+            <a href="{{ url_for('resend_otp') }}" class="text-purple-400 hover:text-purple-300 font-semibold text-sm transition-colors">
+                Resend Code
+            </a>
         </div>
 
         <!-- Back to login -->
         <div class="text-center mt-4">
-
-            <a href="{{ url_for('login') }}"
-               class="text-gray-500 hover:underline">
+            <a href="{{ url_for('login') }}" class="text-gray-500 hover:text-gray-400 text-xs transition-colors">
                Back to Login
             </a>
-
         </div>
 
     </div>

@@ -1,45 +1,57 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Create Profile</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100">
+{% extends 'base.html' %}
+{% block content %}
+<div class="min-h-screen w-full flex items-center justify-center bg-[#020b1a] font-sans">
 
-<div class="max-w-md mx-auto mt-10 bg-white p-6 rounded shadow">
+    <!-- Background Effects -->
+    <div class="absolute inset-0 pointer-events-none overflow-hidden">
+        <div class="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-[120px]"></div>
+    </div>
 
-    <h2 class="text-2xl font-bold mb-6 text-center">Create Your Banking Profile</h2>
+    <div class="relative z-20 w-[95%] max-w-[500px] p-8 md:p-10 rounded-[2rem] bg-[#0a1120]/80 backdrop-blur-2xl shadow-2xl border border-white/5">
 
-    <form method="POST" class="space-y-4">
+        <div class="text-center mb-10">
+            <h2 class="text-3xl font-bold text-white mb-2">Complete Profile</h2>
+            <p class="text-gray-400 text-sm">Finalize your banking account details</p>
+        </div>
 
-        <input name="full_name" placeholder="Full Name"
-               class="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-               required>
+        <form method="POST" class="space-y-5">
 
-        <input name="phone" placeholder="Phone"
-               class="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-               required>
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-gray-500 uppercase ml-1">Full Name</label>
+                <input name="full_name" type="text" placeholder="e.g. John Doe" required
+                       class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all">
+            </div>
 
-        <input name="address" placeholder="Address"
-               class="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-               required>
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-gray-500 uppercase ml-1">Phone Number</label>
+                <input name="phone" type="tel" placeholder="+91 98765 43210" required
+                       class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all">
+            </div>
 
-        <input name="aadhaar" placeholder="Aadhaar Number"
-               class="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-               required>
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-gray-500 uppercase ml-1">Residential Address</label>
+                <input name="address" type="text" placeholder="Street, City, State" required
+                       class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all">
+            </div>
 
-        <button type="submit"
-                class="w-full bg-blue-500 text-white py-3 rounded font-semibold hover:bg-blue-600 transition">
-            Submit Profile
-        </button>
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-gray-500 uppercase ml-1">Aadhaar Number</label>
+                <input name="aadhaar" type="text" placeholder="12-digit Aadhaar Number" required
+                       class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all">
+            </div>
 
-    </form>
+            <button type="submit"
+                    class="w-full mt-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all">
+                Submit Profile
+            </button>
 
-    <p class="text-sm text-gray-500 mt-4 text-center">
-        Your profile will be reviewed by admin for approval.
-    </p>
+        </form>
 
+        <p class="text-xs text-gray-500 mt-8 text-center">
+            Your profile will be reviewed by an admin before activation.
+        </p>
+
+    </div>
 </div>
-
-</body>
-</html> 
+{% endblock %}
