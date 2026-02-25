@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Customer Profile | Secure Bank</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+    :root {
+        --bg-color: #f3f4f6;
+        --card-bg: #ffffff;
+        --accent-green: #16a34a;
+        --accent-primary: #22c55e;
+        --text-main: #0f172a;
+        --text-dim: #6b7280;
+        --border: 1px solid #e5e7eb;
+    }
+
+    body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(180deg, #f9fafb, #eef2ff);
+        color: var(--text-main);
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+        padding: 32px 16px;
+    }
+
+    .card {
+        background: var(--card-bg);
+        border-radius: 18px;
+        padding: 24px 26px;
+        border: var(--border);
+        width: 100%;
+        max-width: 720px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+    }
+    .title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+    }
+    .title-row h2 {
+        margin: 0;
+    }
+    .sub-text {
+        font-size: 13px;
+        color: var(--text-dim);
+        margin-top: 4px;
+    }
+    form {
+        margin-top: 16px;
+    }
+    label {
+        display: block;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-dim);
+        margin-bottom: 4px;
+    }
+    input, textarea, select {
+        width: 100%;
+        box-sizing: border-box;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        padding: 10px 12px;
+        font-size: 14px;
+        margin-bottom: 14px;
+        background: #f9fafb;
+        color: var(--text-main);
+    }
+    textarea {
+        resize: vertical;
+        min-height: 70px;
+    }
+    .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 18px;
+    }
+    .btn-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .btn {
+        border-radius: 999px;
+        padding: 9px 18px;
+        font-size: 13px;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        cursor: pointer;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #22c55e, #16a34a);
+        color: #ecfdf5;
+        border-color: transparent;
+    }
+
+    @media (max-width: 640px) {
+        .card {
+            padding: 18px 16px;
+        }
+        .grid-2 {
+            grid-template-columns: 1fr;
+        }
+    }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="title-row">
+        <div>
+            <h2>Customer Profile</h2>
+            <div class="sub-text">
+                Account {{ user['account_number'] }} · {{ user['email'] }}
+            </div>
+        </div>
+        <button class="btn" onclick="window.location.href='/employee_dashboard'">Back to list</button>
+    </div>
+
+    <form method="POST">
+        <div class="grid-2">
+            <div>
+                <label>Full Name</label>
+                <input type="text" name="full_name" value="{{ user['full_name'] or user['name'] }}">
+            </div>
+            <div>
+                <label>Phone</label>
+                <input type="text" name="phone" value="{{ user['phone'] or '' }}">
+            </div>
+            <div>
+                <label>Aadhaar</label>
+                <input type="text" name="aadhaar" value="{{ user['aadhaar'] or '' }}">
+            </div>
+            <div>
+                <label>Balance (₹)</label>
+                <input type="number" step="0.01" name="balance" value="{{ user['balance'] or 0 }}">
+            </div>
+        </div>
+
+        <label>Address</label>
+        <textarea name="address">{{ user['address'] or '' }}</textarea>
+
+        <div class="grid-2">
+            <div>
+                <label>Approval Status</label>
+                <select name="approval_status">
+                    <option value="approved" {% if user['approval_status'] == 'approved' %}selected{% endif %}>Approved</option>
+                    <option value="pending" {% if user['approval_status'] == 'pending' %}selected{% endif %}>Pending</option>
+                    <option value="rejected" {% if user['approval_status'] == 'rejected' %}selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+            <div>
+                <label>Last Login</label>
+                <input type="text" value="{{ user['last_login'] or '-' }}" disabled>
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <button type="button" class="btn" onclick="window.location.href='/employee_dashboard'">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+    </form>
+</div>
+
+</body>
+</html>
+

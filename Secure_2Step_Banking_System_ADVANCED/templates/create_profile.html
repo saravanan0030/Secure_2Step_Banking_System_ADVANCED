@@ -1,34 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Create Profile</title>
-<script src="https://cdn.tailwindcss.com"></script>
+    <title>Create Profile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
 
 <div class="max-w-md mx-auto mt-10 bg-white p-6 rounded shadow">
 
-<h2 class="text-xl font-bold mb-4">Create Banking Profile</h2>
+    <h2 class="text-2xl font-bold mb-6 text-center">Create Your Banking Profile</h2>
 
-<form method="POST">
+    <form method="POST" class="space-y-4">
 
-<input name="full_name" placeholder="Full Name"
-class="w-full p-2 border mb-3" required>
+        <input name="full_name" placeholder="Full Name"
+               class="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+               required>
 
-<input name="phone" placeholder="Phone"
-class="w-full p-2 border mb-3" required>
+        <input name="phone" placeholder="Phone"
+               class="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+               required>
 
-<input name="address" placeholder="Address"
-class="w-full p-2 border mb-3" required>
+        <input name="address" placeholder="Address"
+               class="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+               required>
 
-<input name="aadhaar" placeholder="Aadhaar Number"
-class="w-full p-2 border mb-3" required>
+        <input name="aadhaar" placeholder="Aadhaar Number"
+               class="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+               required>
 
-<button class="bg-blue-500 text-white px-4 py-2 rounded w-full">
-Create Profile
-</button>
+        <button type="submit"
+                class="w-full bg-blue-500 text-white py-3 rounded font-semibold hover:bg-blue-600 transition">
+            Submit Profile
+        </button>
 
-</form>
+    </form>
+
+    <p class="text-sm text-gray-500 mt-4 text-center">
+        Your profile will be reviewed by admin for approval.
+    </p>
 
 </div>
 

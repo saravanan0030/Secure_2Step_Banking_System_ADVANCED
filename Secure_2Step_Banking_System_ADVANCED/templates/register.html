@@ -29,15 +29,15 @@
 
       <form method="POST" class="w-full space-y-5">
         
-        <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="grid grid-cols-1 mb-6 align-items-center">
            <button type="button" onclick="setRegRole('customer')" id="regCustomer" class="reg-role py-3 rounded-xl border border-white/10 bg-white/5 text-gray-400 font-bold transition-all">Customer</button>
-           <button type="button" onclick="setRegRole('employee')" id="regEmployee" class="reg-role py-3 rounded-xl border border-white/10 bg-white/5 text-gray-400 font-bold transition-all">Employee</button>
+        
            <input type="hidden" name="role" id="regRoleInput" value="customer">
         </div>
 
         <div class="space-y-1">
           <label class="block text-gray-400 text-xs font-bold uppercase ml-1">Full Name</label>
-          <input name="name" type="text" placeholder="John Doe" required
+          <input name="name" type="text" placeholder="Your Name" required
             class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all">
         </div>
 

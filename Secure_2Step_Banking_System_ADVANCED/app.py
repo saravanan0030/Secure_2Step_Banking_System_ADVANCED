@@ -1,66 +1,21 @@
-from flask import Flask, render_template, request, redirect, session, flash
+from flask import Flask, render_template, request, redirect, session, flash, url_for
 import sqlite3
 import random
 import hashlib
 from datetime import datetime, timedelta
+import smtplib
+from email.mime.text import MIMEText
 from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = "super_secret_key_123"
-
 DB_NAME = "database.db"
 
 # ================= DATABASE =================
-
 def db():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
-
-def init_db():
-    conn = db()
-    c = conn.cursor()
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        account_number TEXT UNIQUE,
-        name TEXT,
-        email TEXT UNIQUE,
-        password TEXT,
-        balance REAL DEFAULT 0,
-        role TEXT DEFAULT 'user',
-        full_name TEXT,
-        phone TEXT,
-        address TEXT,
-        aadhaar TEXT,
-        approval_status TEXT DEFAULT 'pending',
-        last_login TEXT
-    )
-    """)
-    # Create Admin
-    admin_email = "admin@bank.com"
-    admin_pw = hashlib.sha256("admin123".encode()).hexdigest()
-    admin = c.execute("SELECT * FROM users WHERE email=?", (admin_email,)).fetchone()
-    if not admin:
-        c.execute("""
-        INSERT INTO users
-        (account_number,name,email,password,role,approval_status,last_login)
-        VALUES (?,?,?,?,?,?,?)
-        """, (
-            "0000000000",
-            "System Admin",
-            admin_email,
-            admin_pw,
-            "admin",
-            "approved",
-            datetime.now().isoformat()
-        ))
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# ================= UTILITIES =================
 
 def hash_text(text):
     return hashlib.sha256(text.encode()).hexdigest()
@@ -68,6 +23,118 @@ def hash_text(text):
 def generate_account():
     return str(random.randint(1000000000, 9999999999))
 
+def generate_otp():
+    return str(random.randint(100000, 999999))
+
+# ================= EMAIL CONFIG =================
+SENDER_EMAIL = "k.saravanan0030@gmail.com"
+SENDER_PASSWORD = "hrgdsfafefqynnvo"
+
+def send_email(to_email, subject, body):
+    try:
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = SENDER_EMAIL
+        msg["To"] = to_email
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server.login(SENDER_EMAIL, SENDER_PASSWORD)
+        server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print("Email error:", e)
+        return False
+
+
+def init_db():
+    conn = db()
+    c = conn.cursor()
+
+    # USERS TABLE
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_number TEXT UNIQUE,
+            name TEXT,
+            email TEXT UNIQUE,
+            password TEXT,
+            balance REAL DEFAULT 0,
+            role TEXT DEFAULT 'user',
+            full_name TEXT,
+            phone TEXT,
+            address TEXT,
+            aadhaar TEXT,
+            approval_status TEXT DEFAULT 'pending',
+            last_login TEXT
+        )
+    """)
+
+    # OTP TABLE
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS otp_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT,
+            otp TEXT,
+            expires_at TEXT,
+            attempts INTEGER DEFAULT 0
+        )
+    """)
+
+    # TRANSACTIONS TABLE
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            ref TEXT,
+            beneficiary_name TEXT,
+            account_number TEXT,
+            ifsc TEXT,
+            type TEXT,
+            amount REAL,
+            created_at TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+    """)
+
+    # DEFAULT ADMIN
+    admin = c.execute("SELECT * FROM users WHERE email='admin@bank.com'").fetchone()
+    if not admin:
+        c.execute("""
+            INSERT INTO users (account_number, name, email, password, role, approval_status, last_login)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "0000000000",
+            "System Admin",
+            "admin@bank.com",
+            "admin123",
+            "admin",
+            "approved",
+            datetime.now().isoformat()
+        ))
+
+    # DEFAULT EMPLOYEE
+    employee = c.execute("SELECT * FROM users WHERE email='employee@bank.com'").fetchone()
+    if not employee:
+        c.execute("""
+            INSERT INTO users (account_number, name, email, password, role, approval_status, last_login)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "1111111111",
+            "Bank Employee",
+            "employee@bank.com",
+            "emp123",
+            "employee",
+            "approved",
+            datetime.now().isoformat()
+        ))
+
+
+
+        
+
+    conn.commit()
+    conn.close()
+# ================= ROLE DECORATOR =================
 def roles_allowed(*roles):
     def wrapper(f):
         @wraps(f)
@@ -75,199 +142,450 @@ def roles_allowed(*roles):
             if "user" not in session:
                 flash("Login required")
                 return redirect("/login")
-            if session["role"] not in roles:
+            if session.get("role") not in roles:
                 flash("Access denied")
                 return redirect("/login")
             return f(*args, **kwargs)
         return decorated
     return wrapper
 
-# ================= HOME =================
-
+ # ================= HOME =================
 @app.route("/")
 def home():
     if "user" not in session:
         return redirect("/login")
+
     conn = db()
     user = conn.execute("""
-    SELECT role,approval_status,full_name
-    FROM users WHERE email=?""", (session["user"],)).fetchone()
+        SELECT role, approval_status, full_name
+        FROM users WHERE email=?
+    """, (session["user"],)).fetchone()
     conn.close()
+
+    # Admin
     if user["role"] == "admin":
         return redirect("/admin_dashboard")
+
+    # Employee
     if user["role"] == "employee":
         return redirect("/employee_dashboard")
+
+    # User profile not created
     if not user["full_name"]:
         return redirect("/create_profile")
+
+    # Waiting approval
     if user["approval_status"] != "approved":
         return redirect("/waiting")
+
+    # Approved user
     return redirect("/user_dashboard")
-
 # ================= REGISTER =================
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
         name = request.form["name"]
         email = request.form["email"]
-        password = hash_text(request.form["password"])
+        raw_password = request.form["password"]
+        password = hash_text(raw_password)
+        role = request.form.get("role", "user").lower()
         acc = generate_account()
+
         conn = db()
         try:
             conn.execute("""
-            INSERT INTO users
-            (account_number,name,email,password,last_login)
-            VALUES (?,?,?,?,?)""", (
-                acc, name, email, password, None
-            ))
+                INSERT INTO users (account_number, name, email, password, role, approval_status)
+                VALUES (?, ?, ?, ?, ?, 'pending')
+            """, (acc, name, email, password, role))
             conn.commit()
-            flash("Registration Successful")
-            return redirect("/login")
-        except:
+
+            otp = generate_otp()
+            expires_at = (datetime.now() + timedelta(minutes=5)).isoformat()
+            conn.execute("INSERT INTO otp_codes (email, otp, expires_at) VALUES (?, ?, ?)",
+                         (email, otp, expires_at))
+            conn.commit()
+            conn.close()
+
+            send_email(email, "Your Bank OTP",
+                       f"Your OTP is {otp}. Expires in 5 minutes. Max 3 attempts.")
+
+            session["otp_email"] = email
+            flash("Registration successful! OTP sent.")
+            return redirect("/verify_otp")
+
+        except sqlite3.IntegrityError:
             flash("Email already exists")
-        conn.close()
+            conn.close()
+
     return render_template("register.html")
 
-# ================= LOGIN =================
 
+
+
+ 
+# ================= OTP VERIFY =================
+@app.route("/verify_otp", methods=["GET", "POST"])
+def verify_otp():
+    if "otp_email" not in session:
+        return redirect("/login")
+
+    email = session["otp_email"]
+    conn = db()
+    record = conn.execute("""
+        SELECT * FROM otp_codes WHERE email=?
+        ORDER BY id DESC LIMIT 1
+    """, (email,)).fetchone()
+
+    if not record:
+        session.pop("otp_email")
+        return redirect("/login")
+
+    if datetime.fromisoformat(record["expires_at"]) < datetime.now():
+        session.pop("otp_email")
+        return redirect("/login")
+
+    if request.method == "POST":
+        otp_input = request.form["otp"]
+
+        if record["attempts"] >= 3:
+            session.pop("otp_email")
+            return redirect("/login")
+
+        if otp_input != record["otp"]:
+            conn.execute("UPDATE otp_codes SET attempts=attempts+1 WHERE id=?",
+                         (record["id"],))
+            conn.commit()
+            return redirect("/verify_otp")
+
+        session["user"] = email
+        conn.execute("UPDATE users SET last_login=? WHERE email=?",
+                     (datetime.now().isoformat(), email))
+        conn.commit()
+        conn.close()
+        session.pop("otp_email")
+        return redirect("/create_profile")
+
+    return render_template("otp.html")
+
+
+
+# ================= RESEND OTP =================
+@app.route("/resend_otp")
+def resend_otp():
+    if "otp_email" not in session:
+        flash("No OTP process found. Please register again.")
+        return redirect("/login")
+
+    email = session["otp_email"]
+
+    otp = generate_otp()
+    expires_at = (datetime.now() + timedelta(minutes=5)).isoformat()
+
+    conn = db()
+
+    # Optional: delete old OTPs for this email (clean system)
+    conn.execute("DELETE FROM otp_codes WHERE email=?", (email,))
+
+    conn.execute("""
+        INSERT INTO otp_codes (email, otp, expires_at, attempts)
+        VALUES (?, ?, ?, 0)
+    """, (email, otp, expires_at))
+
+    conn.commit()
+    conn.close()
+
+    send_email(
+        email,
+        "Your Bank OTP (Resent)",
+        f"Your new OTP is {otp}. It expires in 5 minutes. Maximum 3 attempts allowed."
+    )
+
+    flash("New OTP sent to your email.")
+    return redirect("/verify_otp")
+
+ 
+ # ================= LOGIN =================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form["email"]
-        password = hash_text(request.form["password"])
-        selected_role = request.form["role"]
+        raw_password = request.form["password"]
+        password = hash_text(raw_password)
+        selected_role = request.form.get("role", "").lower()
+
         conn = db()
-        user = conn.execute("""
-        SELECT email,password,role
-        FROM users WHERE email=?""", (email,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
         conn.close()
 
         if not user:
             flash("User not found")
             return redirect("/login")
-        if password != user["password"]:
+
+        stored_pw = user["password"]
+        # Support both hashed and legacy plain-text passwords (for default admin/employee)
+        if stored_pw != password and stored_pw != raw_password:
             flash("Invalid password")
             return redirect("/login")
-        if user["role"] != selected_role:
-            flash(f"Invalid role selected for this account ({user['role']})")
+
+        db_role = user["role"].lower()
+
+        # Convert old 'customer' role to 'user'
+        if db_role == "customer":
+            db_role = "user"
+
+        if db_role != selected_role:
+            flash(f"This account is registered as '{user['role']}'")
+            return redirect("/login")
+
+        if db_role == "user" and user["approval_status"] != "approved":
+            flash("Account not approved yet")
             return redirect("/login")
 
         session.clear()
         session["user"] = email
-        session["role"] = user["role"]
-        flash("Login success")
+        session["role"] = db_role
 
-        if user["role"] == "admin":
+        if db_role == "admin":
             return redirect("/admin_dashboard")
-        elif user["role"] == "employee":
+        elif db_role == "employee":
             return redirect("/employee_dashboard")
         else:
             return redirect("/user_dashboard")
+
     return render_template("login.html")
 
-# ================= CREATE PROFILE =================
 
+
+# ================= CREATE PROFILE =================
 @app.route("/create_profile", methods=["GET", "POST"])
 def create_profile():
+
+    if "user" not in session:
+        flash("Login required")
+        return redirect("/login")
+
     if request.method == "POST":
+
+        full_name = request.form.get("full_name")
+        phone = request.form.get("phone")
+        address = request.form.get("address")
+        aadhaar = request.form.get("aadhaar")
+
         conn = db()
-        conn.execute("""UPDATE users SET full_name=?, phone=?, address=?, aadhaar=?,
-                        approval_status='pending' WHERE email=?""",
-                     (request.form["full_name"], request.form["phone"],
-                      request.form["address"], request.form["aadhaar"], session["user"]))
+        conn.execute("""
+            UPDATE users
+            SET full_name=?, phone=?, address=?, aadhaar=?, approval_status='pending'
+            WHERE email=?
+        """, (full_name, phone, address, aadhaar, session["user"]))
+
         conn.commit()
         conn.close()
+
+        flash("Profile submitted for approval.")
         return redirect("/waiting")
+
     return render_template("create_profile.html")
-
-# ================= WAITING =================
-
+ # ================= WAITING =================
 @app.route("/waiting")
 def waiting():
+    if "user" not in session:
+        return redirect("/login")
+
     conn = db()
-    status = conn.execute("""SELECT approval_status FROM users WHERE email=?""",
-                          (session["user"],)).fetchone()["approval_status"]
+    status = conn.execute(
+        "SELECT approval_status FROM users WHERE email=?",
+        (session["user"],)
+    ).fetchone()["approval_status"]
     conn.close()
+
     if status == "approved":
+        flash("Account approved! Welcome.")
         return redirect("/user_dashboard")
+
     return render_template("waiting.html")
 
-# ================= USER DASHBOARD =================
-
+# ================= DASHBOARDS =================
 @app.route("/user_dashboard")
+@roles_allowed("user")
 def user_dashboard():
     conn = db()
-    user = conn.execute("SELECT * FROM users WHERE email=?", (session["user"],)).fetchone()
-    conn.close()
-    return render_template("user_dashboard.html", customer=user)
+    user = conn.execute(
+        "SELECT * FROM users WHERE email=?",
+        (session["user"],)
+    ).fetchone()
 
-# ================= EMPLOYEE MODULE =================
+    transactions = conn.execute(
+        """
+        SELECT * FROM transactions
+        WHERE user_id=?
+        ORDER BY datetime(created_at) DESC
+        LIMIT 50
+        """,
+        (user["id"],),
+    ).fetchall()
+
+    conn.close()
+    return render_template("user_dashboard.html", customer=user, transactions=transactions)
+
+
+@app.route("/user_transaction", methods=["POST"])
+@roles_allowed("user")
+def user_transaction():
+    amount_raw = request.form.get("amount", "").strip()
+    tx_type = request.form.get("type", "imps").lower()
+    beneficiary_name = request.form.get("beneficiary_name", "").strip()
+    account_number = request.form.get("account_number", "").strip()
+    ifsc = request.form.get("ifsc", "").strip()
+
+    if not amount_raw:
+        flash("Please enter amount.")
+        return redirect("/user_dashboard")
+
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        flash("Invalid amount.")
+        return redirect("/user_dashboard")
+
+    if amount <= 0:
+        flash("Amount must be greater than zero.")
+        return redirect("/user_dashboard")
+
+    conn = db()
+    user = conn.execute(
+        "SELECT * FROM users WHERE email=?",
+        (session["user"],)
+    ).fetchone()
+
+    if not user:
+        conn.close()
+        flash("User not found.")
+        return redirect("/login")
+
+    current_balance = user["balance"] or 0
+    ref = f"TXN{random.randint(100000, 999999)}"
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    conn.execute(
+        """
+        INSERT INTO transactions
+            (user_id, ref, beneficiary_name, account_number, ifsc, type, amount, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (user["id"], ref, beneficiary_name, account_number, ifsc, tx_type, amount, created_at),
+    )
+
+    new_balance = current_balance - amount
+    conn.execute(
+        "UPDATE users SET balance=? WHERE id=?",
+        (new_balance, user["id"]),
+    )
+
+    conn.commit()
+    conn.close()
+
+    flash("Transfer successful.")
+    return redirect("/user_dashboard")
 
 @app.route("/employee_dashboard")
 @roles_allowed("employee")
 def employee_dashboard():
     conn = db()
-    employee = conn.execute("SELECT * FROM users WHERE email=?", (session["user"],)).fetchone()
-    users = conn.execute("""
-        SELECT id, account_number, name, email, full_name, phone, address, aadhaar, approval_status
-        FROM users WHERE role='user'
-    """).fetchall()
+    employee = conn.execute(
+        "SELECT * FROM users WHERE email=?",
+        (session["user"],)
+    ).fetchone()
+    # Show both legacy 'customer' and new 'user' roles
+    users = conn.execute(
+        "SELECT * FROM users WHERE role IN ('user','customer')"
+    ).fetchall()
+
+    total_users = len(users)
+    approved_users = sum(1 for u in users if u["approval_status"] == "approved")
+    pending_users = sum(1 for u in users if u["approval_status"] != "approved")
+    total_balance = sum((u["balance"] or 0) for u in users)
+
     conn.close()
-    return render_template("employee_dashboard.html", employee=employee, users=users)
+    return render_template(
+        "employee_dashboard.html",
+        employee=employee,
+        users=users,
+        total_users=total_users,
+        approved_users=approved_users,
+        pending_users=pending_users,
+        total_balance=total_balance,
+    )
 
 
 @app.route("/employee_user/<int:user_id>", methods=["GET", "POST"])
 @roles_allowed("employee")
-def employee_user_profile(user_id):
+def employee_user(user_id):
     conn = db()
-    user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    user = conn.execute(
+        "SELECT * FROM users WHERE id=?",
+        (user_id,),
+    ).fetchone()
+
+    if not user:
+        conn.close()
+        flash("Customer not found.")
+        return redirect("/employee_dashboard")
+
     if request.method == "POST":
-        full_name = request.form["full_name"]
-        phone = request.form["phone"]
-        address = request.form["address"]
-        aadhaar = request.form["aadhaar"]
-        approval_status = request.form["approval_status"]
-        conn.execute("""
-            UPDATE users SET full_name=?, phone=?, address=?, aadhaar=?, approval_status=?
+        full_name = request.form.get("full_name") or None
+        phone = request.form.get("phone") or None
+        address = request.form.get("address") or None
+        aadhaar = request.form.get("aadhaar") or None
+        approval_status = request.form.get("approval_status") or user["approval_status"]
+
+        balance_raw = request.form.get("balance", "").strip()
+        try:
+            balance = float(balance_raw) if balance_raw else user["balance"]
+        except ValueError:
+            balance = user["balance"]
+
+        conn.execute(
+            """
+            UPDATE users
+            SET full_name=?, phone=?, address=?, aadhaar=?, balance=?, approval_status=?
             WHERE id=?
-        """, (full_name, phone, address, aadhaar, approval_status, user_id))
+            """,
+            (full_name, phone, address, aadhaar, balance, approval_status, user_id),
+        )
         conn.commit()
         conn.close()
-        flash("User profile updated successfully")
+        flash("Customer profile updated.")
         return redirect("/employee_dashboard")
+
     conn.close()
-    return render_template("employee_user_profile.html", employee=session["user"], user=user)
-
-
-@app.route("/create_employee", methods=["POST"])
-@roles_allowed("employee", "admin")
-def create_employee():
-    name = request.form["name"]
-    email = request.form["email"]
-    password = hash_text(request.form["password"])
-    role = request.form.get("role", "employee")
-    conn = db()
-    try:
-        conn.execute("""
-        INSERT INTO users (name, email, password, role, last_login)
-        VALUES (?,?,?,?,?)""", (name, email, password, role, None))
-        conn.commit()
-        flash("Employee created successfully")
-    except sqlite3.IntegrityError:
-        flash("Email already exists")
-    conn.close()
-    return redirect("/employee_dashboard")
-
-# ================= ADMIN DASHBOARD =================
+    return render_template("employee_user.html", user=user)
 
 @app.route("/admin_dashboard")
 @roles_allowed("admin")
 def admin_dashboard():
     conn = db()
-    users = conn.execute("SELECT id, name, email, role, balance, approval_status FROM users").fetchall()
-    conn.close()
-    return render_template("admin_dashboard.html", users=users)
+    users = conn.execute("SELECT * FROM users").fetchall()
 
+    total_users = len(users)
+    total_admins = sum(1 for u in users if u["role"] == "admin")
+    total_employees = sum(1 for u in users if u["role"] == "employee")
+    total_customers = sum(1 for u in users if u["role"] not in ("admin", "employee"))
+    pending_users = sum(1 for u in users if u["approval_status"] != "approved")
+    approved_users = sum(1 for u in users if u["approval_status"] == "approved")
+    total_balance = sum((u["balance"] or 0) for u in users)
+
+    conn.close()
+    return render_template(
+        "admin_dashboard.html",
+        users=users,
+        total_users=total_users,
+        total_admins=total_admins,
+        total_employees=total_employees,
+        total_customers=total_customers,
+        pending_users=pending_users,
+        approved_users=approved_users,
+        total_balance=total_balance,
+    )
 
 @app.route("/approve/<int:id>")
 @roles_allowed("admin")
@@ -279,13 +597,12 @@ def approve(id):
     return redirect("/admin_dashboard")
 
 # ================= LOGOUT =================
-
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/login")
 
 # ================= RUN =================
-
 if __name__ == "__main__":
-    app.run(debug=True) 
+    init_db()
+    app.run(debug=True)

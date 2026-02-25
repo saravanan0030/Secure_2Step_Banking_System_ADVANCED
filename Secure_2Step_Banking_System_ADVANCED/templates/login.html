@@ -1,78 +1,78 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-[#020b1a] font-sans">
-  <!-- Background effects omitted for brevity -->
+<div class="min-h-screen w-full flex items-center justify-center bg-[#020b1a] font-sans">
 
-  <div class="relative z-20 w-[90%] max-w-[550px] aspect-[1/1.1] p-[2px] rounded-[2.5rem] bg-gradient-to-b from-white/20 to-transparent backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-    <div class="w-full h-full bg-[#0a1120]/80 rounded-[2.4rem] p-8 md:p-12 flex flex-col items-center">
-      <h2 class="text-4xl md:text-5xl font-bold text-white mb-10 tracking-wide">Bank Login</h2>
+  <div class="relative z-20 w-[90%] max-w-[550px] p-8 rounded-3xl bg-[#0a1120]/80 backdrop-blur-2xl shadow-xl">
 
+    <h2 class="text-4xl font-bold text-white mb-10 text-center">Bank Login</h2>
+
+    <form method="POST" class="space-y-6">
+
+      <!-- Role Selection -->
       <div class="grid grid-cols-3 gap-3 w-full mb-12">
         <button type="button" onclick="setRole('admin')" id="adminBtn"
-          class="role-btn flex items-center justify-center gap-2 py-3 rounded-xl border border-blue-500/50 bg-blue-900/40 text-white font-semibold transition-all hover:brightness-125 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+          class="role-btn flex items-center justify-center gap-2 py-3 rounded-xl border border-blue-500/50 bg-blue-900/40 text-white font-semibold transition-transform duration-300 ease-in-out hover:scale-105 hover:shadow-lg">
           <span class="text-sm">⚙️</span> Admin
         </button>
 
         <button type="button" onclick="setRole('employee')" id="employeeBtn"
-          class="role-btn flex items-center justify-center gap-2 py-3 rounded-xl border border-orange-500/50 bg-orange-600 text-white font-semibold transition-all hover:brightness-110">
+          class="role-btn flex items-center justify-center gap-2 py-3 rounded-xl border border-orange-500/50 bg-orange-600 text-white font-semibold transition-transform duration-300 ease-in-out hover:scale-105 hover:shadow-lg">
           <span class="text-sm">💼</span> Employee
         </button>
 
         <button type="button" onclick="setRole('user')" id="userBtn"
-          class="role-btn flex items-center justify-center gap-2 py-3 rounded-xl border border-green-500/50 bg-green-600 text-white font-semibold transition-all hover:brightness-110">
+          class="role-btn flex items-center justify-center gap-2 py-3 rounded-xl border border-green-500/50 bg-green-600 text-white font-semibold transition-transform duration-300 ease-in-out hover:scale-105 hover:shadow-lg">
           <span class="text-sm">👤</span> User
         </button>
+
+        <input type="hidden" name="role" id="roleInput" value="admin">
       </div>
 
-      <form method="POST" class="w-full space-y-6">
-        <!-- Hidden role input -->
-        <input type="hidden" name="role" id="roleInput" value="admin">
+      <!-- Email -->
+      <div>
+        <label class="block text-gray-300 text-sm mb-1">Email</label>
+        <input type="email" name="email" placeholder="you@example.com" required
+          class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all">
+      </div>
 
-        <div class="space-y-2">
-          <label class="block text-gray-300 text-sm font-medium ml-1">Email</label>
-          <input type="email" name="email" placeholder="you@example.com" required
-            class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all">
-        </div>
+      <!-- Password -->
+      <div>
+        <label class="block text-gray-300 text-sm mb-1">Password</label>
+        <input type="password" name="password" placeholder="••••••••" required
+          class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all">
+      </div>
 
-        <div class="space-y-2">
-          <label class="block text-gray-300 text-sm font-medium ml-1">Password</label>
-          <input type="password" name="password" placeholder="••••••••" required
-            class="w-full bg-[#161f32] border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all">
-        </div>
+      <button type="submit"
+        class="w-full mt-6 bg-gradient-to-r from-[#2563eb] via-[#3b82f6] to-[#1d4ed8] text-white py-4 rounded-full font-bold text-xl shadow-lg hover:scale-105 hover:shadow-2xl transition-all">
+        Login
+      </button>
 
-        <button type="submit"
-          class="w-full mt-8 bg-gradient-to-r from-[#2563eb] via-[#3b82f6] to-[#1d4ed8] text-white py-4 rounded-full font-bold text-xl shadow-[0_8px_20px_rgba(37,99,235,0.4)] hover:scale-[1.01] active:scale-[0.98] transition-all">
-          Login
-        </button>
-      </form>
+    </form>
 
-      <p class="mt-8 text-gray-400 text-sm">
-        Don't have an account?
-        <a href="/register" class="text-blue-400 hover:underline font-semibold">Register</a>
-      </p>
-    </div>
+    <p class="mt-6 text-gray-400 text-sm text-center">
+      Don't have an account? 
+      <a href="/register" class="text-blue-400 hover:underline font-semibold">Register</a>
+    </p>
   </div>
 </div>
 
 <script>
-  function setRole(role) {
-    document.getElementById('roleInput').value = role;
+function setRole(role) {
+  // Set hidden input value
+  document.getElementById('roleInput').value = role;
 
-    // Remove highlight from all
-    const btns = ['adminBtn', 'employeeBtn', 'userBtn'];
-    btns.forEach(id => {
-      const el = document.getElementById(id);
-      el.style.boxShadow = 'none';
-      el.style.transform = 'scale(1)';
-    });
+  // Remove active classes from all buttons
+  ['adminBtn', 'employeeBtn', 'userBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('scale-110','shadow-2xl','ring-4','ring-offset-2','ring-white/30');
+  });
 
-    // Highlight selected
-    const activeBtn = document.getElementById(role + 'Btn');
-    activeBtn.style.boxShadow = '0 0 20px rgba(255,255,255,0.3)';
-    activeBtn.style.transform = 'scale(1.05)';
-  }
+  // Add active classes to selected button
+  const activeBtn = document.getElementById(role+'Btn');
+  activeBtn.classList.add('scale-110','shadow-2xl','ring-4','ring-offset-2','ring-white/30');
+}
 
-  // Initialize with Admin selected
-  window.onload = () => setRole('admin');
+// Initialize default role as admin
+window.onload = () => setRole('admin');
 </script>
 {% endblock %} 

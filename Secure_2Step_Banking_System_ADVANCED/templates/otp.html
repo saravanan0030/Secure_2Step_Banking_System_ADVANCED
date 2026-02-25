@@ -1,4 +1,4 @@
- {% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block content %}
 
@@ -22,6 +22,16 @@
         </div>
         {% endif %}
         {% endwith %}
+
+        <!-- Countdown Timer -->
+        <div id="countdown" class="text-center text-red-500 font-semibold mb-4">
+            Loading timer...
+        </div>
+
+        <!-- Remaining Attempts -->
+        <div id="attempts" class="text-center text-gray-600 mb-4">
+            Remaining attempts: {{ remaining_attempts }}
+        </div>
 
         <!-- OTP Form -->
         <form method="POST">
@@ -50,10 +60,11 @@
                 Didn't receive OTP?
             </p>
 
-            <a href="{{ url_for('resend_otp') }}"
-               class="text-purple-600 font-semibold hover:underline">
-               Resend OTP
-            </a>
+            
+
+            <a href="{{ url_for('resend_otp') }}" class="text-blue-400 hover:underline font-semibold">
+    Resend OTP
+</a>
 
         </div>
 
@@ -71,4 +82,28 @@
 
 </div>
 
-{% endblock %}
+<!-- Countdown Timer Script -->
+<script>
+    // Get OTP expiry timestamp from Flask
+    let expiresAt = "{{ expires_at }}";  // pass from Flask route
+    let expiryTime = new Date(expiresAt).getTime();
+
+    // Update countdown every second
+    let timer = setInterval(function() {
+        let now = new Date().getTime();
+        let distance = expiryTime - now;
+
+        if(distance <= 0) {
+            clearInterval(timer);
+            document.getElementById("countdown").innerHTML = "OTP expired! Please login again.";
+            document.querySelector('input[name="otp"]').disabled = true;
+            document.querySelector('button').disabled = true;
+        } else {
+            let minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            let seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            document.getElementById("countdown").innerHTML = "Time remaining: " + minutes + "m " + seconds + "s";
+        }
+    }, 1000);
+</script>
+
+{% endblock %} 
