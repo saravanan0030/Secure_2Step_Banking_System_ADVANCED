@@ -731,24 +731,33 @@ td { padding: 12px 0; border-bottom: 1px solid #222; }
                 <tbody>
                     {% if transactions %}
                         {% for t in transactions %}
+                        {% set is_credit = t.type in ['deposit', 'upi', 'crypto'] %}
+                        {% set amt = t.amount or 0 %}
+                        {% if is_credit %}
+                            {% set css_color = 'var(--accent-green)' %}
+                            {% set sign = '+' %}
+                        {% else %}
+                            {% set css_color = 'var(--accent-red)' %}
+                            {% set sign = '-' %}
+                        {% endif %}
                         <tr>
-                            <td>{{ t[5] }}</td>
-                            <td>{{ t[2]|upper }} Transfer</td>
+                            <td>{{ t.created_at }}</td>
+                            <td>{{ t.type|upper }} Transfer</td>
                             <td>
-                                {% if t[2] == 'upi' %}
-                                    <span class="badge-upi">{{ t[4] }}</span>
-                                {% elif t[2] == 'neft' %}
-                                    <span class="badge-neft">{{ t[4] }}</span>
-                                {% elif t[2] == 'crypto' %}
-                                    <span class="badge-crypto">{{ t[4] }}</span>
-                                {% elif t[2] == 'deposit' %}
-                                    <span class="badge-deposit">{{ t[4] }}</span>
+                                {% if t.type == 'upi' %}
+                                    <span class="badge-upi">{{ t.ref }}</span>
+                                {% elif t.type == 'neft' %}
+                                    <span class="badge-neft">{{ t.ref }}</span>
+                                {% elif t.type == 'crypto' %}
+                                    <span class="badge-crypto">{{ t.ref }}</span>
+                                {% elif t.type == 'deposit' %}
+                                    <span class="badge-deposit">{{ t.ref }}</span>
                                 {% else %}
-                                    <span class="badge-withdraw">{{ t[4] }}</span>
+                                    <span class="badge-withdraw">{{ t.ref }}</span>
                                 {% endif %}
                             </td>
-                            <td style="color: {{ 'var(--accent-green)' if t[2] in ['deposit','upi','crypto'] else 'var(--accent-red)' }}">
-                                {{ '+' if t[2] in ['deposit','upi','crypto'] else '-' }} ₹{{ "{:,.2f}".format((t[3] or 0)|float) }}
+                            <td style="color: {{ css_color }}">
+                                {{ sign }} ₹{{ '%.2f'|format(amt) }}
                             </td>
                         </tr>
                         {% endfor %}

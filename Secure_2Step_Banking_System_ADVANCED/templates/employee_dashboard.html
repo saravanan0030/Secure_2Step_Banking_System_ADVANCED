@@ -283,29 +283,30 @@
 
     <div class="dashboard-top row g-3">
         <div class="col-12 col-lg-6">
-        <div class="card h-100">
-            <div class="overview-header-row">
-                <div>
-                    <span class="bank-label">Quick Overview</span>
-                    <h3 class="overview-title">Pending Approvals</h3>
+            <div class="card h-100">
+                <div class="overview-header-row">
+                    <div>
+                        <span class="bank-label">Quick Overview</span>
+                        <h3 class="overview-title">Pending Approvals</h3>
+                    </div>
                 </div>
-            </div>
-            <div class="overview-main-number">{{ pending_users }}</div>
-            <div class="overview-sub-row">
-                Customer accounts waiting for KYC / manual approval.
-            </div>
-            <div class="overview-foot-row">
-                <div>
-                    <div class="bank-label">Total Customers</div>
-                    <div class="overview-foot-number">{{ total_users }}</div>
+                <div class="overview-main-number">{{ pending_users }}</div>
+                <div class="overview-sub-row">
+                    Customer accounts waiting for KYC / manual approval.
                 </div>
-                <div>
-                    <div class="bank-label">Approved</div>
-                    <div class="overview-foot-number">{{ approved_users }}</div>
-                </div>
-                <div>
-                    <div class="bank-label">Total Balance (₹)</div>
-                    <div class="overview-foot-number">₹{{ "{:,.2f}".format(total_balance) }}</div>
+                <div class="overview-foot-row">
+                    <div>
+                        <div class="bank-label">Total Customers</div>
+                        <div class="overview-foot-number">{{ total_users }}</div>
+                    </div>
+                    <div>
+                        <div class="bank-label">Approved</div>
+                        <div class="overview-foot-number">{{ approved_users }}</div>
+                    </div>
+                    <div>
+                        <div class="bank-label">Total Balance (₹)</div>
+                        <div class="overview-foot-number">₹{{ "{:,.2f}".format(total_balance) }}</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -343,9 +344,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
         </div>
     </div>
 
