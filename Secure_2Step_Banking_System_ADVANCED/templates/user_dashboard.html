@@ -492,7 +492,7 @@ td { padding: 12px 0; border-bottom: 1px solid #222; }
                     </div>
                     <div>
                         <div class="sub-text">Last login</div>
-                        <div class="overview-foot-number">{{ customer[13] if customer[13] else 'Just now' }}</div>
+                        <div class="overview-foot-number">{{ customer['last_login'] or 'Just now' }}</div>
                     </div>
                 </div>
             </div>
@@ -756,7 +756,7 @@ td { padding: 12px 0; border-bottom: 1px solid #222; }
                                     <span class="badge-withdraw">{{ t.ref }}</span>
                                 {% endif %}
                             </td>
-                            <td style="color: {{ css_color }}">
+                            <td >
                                 {{ sign }} ₹{{ '%.2f'|format(amt) }}
                             </td>
                         </tr>
