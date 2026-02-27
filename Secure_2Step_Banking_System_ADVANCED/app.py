@@ -27,8 +27,8 @@ def generate_otp():
     return str(random.randint(100000, 999999))
 
 # ================= EMAIL CONFIG =================
-SENDER_EMAIL = "k.saravanan0030@gmail.com"
-SENDER_PASSWORD = "hrgdsfafefqynnvo"
+SENDER_EMAIL = "securebankindia@gmail.com"
+SENDER_PASSWORD = "jxlkyhrlalxnwkpu"
 
 def send_email(to_email, subject, body):
     try:
@@ -136,10 +136,6 @@ def init_db():
             "approved",
             datetime.now().isoformat()
         ))
-
-
-
-        
 
     conn.commit()
     conn.close()
@@ -287,7 +283,7 @@ def verify_otp():
 
         # OTP is correct. If this is a fresh registration, create the user now.
         if pending and pending.get("email") == email:
-            acc = generate_account()
+            acc = generate_account()  
             try:
                 conn.execute(
                     """
@@ -609,6 +605,7 @@ def user_transaction():
 
     flash("Transfer successful.")
     return redirect("/user_dashboard")
+
 
 @app.route("/employee_dashboard")
 @roles_allowed("employee")
